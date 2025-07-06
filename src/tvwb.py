@@ -26,7 +26,7 @@ def start(
             default='0.0.0.0'
         ),
         port: int = typer.Option(
-            default=5000
+            default=5001
         ),
         workers: int = typer.Option(
             default=1,
@@ -213,7 +213,7 @@ def send_webhook(key: str):
         "key": key})
     # send with curl
     run(['curl', '-X', 'POST', '-H', 'Content-Type: application/json', '-d', post_data,
-         'http://localhost:5000/webhook'])
+         'http://localhost:5001/webhook'])
 
 
 if __name__ == "__main__":
