@@ -2,6 +2,7 @@
 from logging import getLogger, DEBUG
 
 from flask import Flask, request, jsonify, render_template, Response
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from commons import VERSION_NUMBER, LOG_LOCATION
 from components.actions.base.action import am
@@ -19,6 +20,11 @@ registered_events = [register_event(event) for event in REGISTERED_EVENTS]
 registered_links = [register_link(link, em, am) for link in REGISTERED_LINKS]
 
 app = Flask(__name__)
+
+# Configure Flask to work behind a reverse proxy
+app.config['PREFERRED_URL_SCHEME'] = 'https'  # If using HTTPS
+# Trust proxy headers (important for getting correct client IP and protocol)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # configure logging
 logger = get_logger(__name__)

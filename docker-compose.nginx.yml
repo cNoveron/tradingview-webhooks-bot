@@ -1,0 +1,37 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./src/components:/app/components
+      - ./src/settings.py:/app/settings.py
+      - ./src/.gui_key:/app/.gui_key
+    ports:
+      - "127.0.0.1:5001:5001"  # Only bind to localhost, not exposed externally
+    networks:
+      - app-network
+    command: ["python3", "tvwb.py", "start", "--host", "0.0.0.0", "--port", "5000"]
+    environment:
+      - FLASK_ENV=production
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"  # For HTTPS if needed
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - app
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  nginx-logs:
