@@ -1,5 +1,5 @@
 # actions
-REGISTERED_ACTIONS = ['PrintData', 'AsyncDemo', 'ProcessSignal']
+REGISTERED_ACTIONS = ['PrintData', 'ProcessSignal']
 
 # events
 REGISTERED_EVENTS = ['WebhookReceived']

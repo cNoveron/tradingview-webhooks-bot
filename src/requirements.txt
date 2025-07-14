@@ -19,3 +19,4 @@ typer-cli==0.0.13
 typing_extensions==4.5.0
 Werkzeug==3.0.1
 zipp==3.15.0
+requests==2.31.0

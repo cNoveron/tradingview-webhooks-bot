@@ -124,7 +124,7 @@ docker-compose -f docker-compose.nginx.yml up -d
 4. **Monitor logs**:
    ```bash
    docker-compose -f docker-compose.nginx.yml logs -f app
-   ```
+```
 
 ## 🔍 **Troubleshooting**
 
