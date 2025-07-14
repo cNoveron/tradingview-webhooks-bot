@@ -1,9 +1,9 @@
 # actions
-REGISTERED_ACTIONS = ['PrintData', 'ProcessSignal']
+REGISTERED_ACTIONS = ['BitsoSpot']
 
 # events
 REGISTERED_EVENTS = ['WebhookReceived']
 
 # links
-REGISTERED_LINKS = [('PrintData', 'WebhookReceived'), ('AsyncDemo', 'WebhookReceived')]
+REGISTERED_LINKS = [('BitsoSpot', 'WebhookReceived')]
 
