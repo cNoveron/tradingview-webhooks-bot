@@ -78,10 +78,13 @@ class Event:
 
             # pass data
             data = kwargs.get('data')
+            logger.info(f"DEBUG: Event {self.name} has {len(self._actions)} actions registered")
 
             self.logs.append(log_event)
-            for action in self._actions:
+            for i, action in enumerate(self._actions):
+                logger.info(f"DEBUG: Triggering action {i}: {action} (type: {type(action)})")
                 action.set_data(data)
                 action.run()
+                logger.info(f"DEBUG: Completed action {i}: {action}")
         else:
             logger.info(f'EVENT NOT TRIGGERED (event is inactive) --->\t{str(self)}')

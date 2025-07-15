@@ -19,11 +19,14 @@ def register_action(action_name):
     try:
         # snake case name
         snake_case_name = snake_case(action_name)
+        logger.info(f"DEBUG: Attempting to import module components.actions.{snake_case_name}")
         # import the target file
         action = getattr(import_module(f'components.actions.{snake_case_name}', action_name), action_name)()
+        logger.info(f"DEBUG: Successfully created action instance: {action} (type: {type(action)})")
         logger.debug(f'Imported action module --->\t{snake_case_name}')
         # register the action
         action.register()
+        logger.info(f"DEBUG: Action registered successfully in action manager")
         logger.info(f'Action "{action_name}" registered successfully!')
         return action_name
     except Exception as e:
@@ -60,9 +63,13 @@ def register_event(event_name: str):
 
 def register_link(link: tuple, event_manager, action_manager):
     try:
+        logger.info(f"DEBUG: Attempting to register link {link[0]} -> {link[1]}")
         action = action_manager.get(link[0])
+        logger.info(f"DEBUG: Found action: {action} (type: {type(action)})")
         event = event_manager.get(link[1])
+        logger.info(f"DEBUG: Found event: {event} (type: {type(event)})")
         event.add_action(action)
+        logger.info(f"DEBUG: Successfully added action to event. Event now has {len(event._actions)} actions")
         logger.info(f'Link "{link[0]} -> {link[1]}" registered successfully!')
         return True
     except Exception as e:
