@@ -55,16 +55,11 @@ class HMACAuthenticator:
             hashlib.sha256
         ).hexdigest()
 
-    def _create_auth_payload(self, nonce: int, signature: str) -> str:
+    def _create_auth_header(self, nonce: int, signature: str) -> str:
         """
-        Create authorization header payload
+        Create authorization header in Bitso format: Bitso <key>:<nonce>:<signature>
         """
-        auth_data = {
-            'key': self.api_key,
-            'nonce': nonce,
-            'signature': signature
-        }
-        return base64.b64encode(json.dumps(auth_data).encode('utf-8')).decode('utf-8')
+        return f"Bitso {self.api_key}:{nonce}:{signature}"
 
     def authenticate_request(self, request: AuthenticatedRequest) -> Dict[str, str]:
         """
@@ -78,11 +73,11 @@ class HMACAuthenticator:
             request.body
         )
         signature = self._generate_signature(signature_string)
-        auth_payload = self._create_auth_payload(nonce, signature)
+        auth_header = self._create_auth_header(nonce, signature)
 
         return {
             'Content-Type': 'application/json',
-            'Authorization': auth_payload
+            'Authorization': auth_header
         }
 
     def authenticated_request(self, url: str, method: str, body: Optional[Any] = None) -> requests.Response:
