@@ -1,28 +1,19 @@
 from components.actions.base.action import Action
 from utils.hmac_auth import create_hmac_authenticator
 from utils.log import get_logger
+from config import bitso_config
 import json
 
 logger = get_logger(__name__)
 
 
 class BitsoSpot(Action):
-    # Add your API_KEY from Bitso
-    API_KEY = ''
-    # Add your API_SECRET from Bitso
-    API_SECRET = ''
-
-    # Bitso API base URL
-    BASE_URL = 'https://api.bitso.com'
-
     def __init__(self):
-        logger.info(f"BitsoSpot.__init__() called with API_KEY='{self.API_KEY}', API_SECRET='{self.API_SECRET}'")
+        logger.info(f"BitsoSpot.__init__() called with config: {bitso_config}")
         super().__init__()
 
-        if not self.API_KEY or not self.API_SECRET:
-            raise ValueError("API_KEY and API_SECRET must be set")
-
-        self.authenticator = create_hmac_authenticator(self.API_KEY, self.API_SECRET)
+        self.config = bitso_config
+        self.authenticator = create_hmac_authenticator(self.config.api_key, self.config.api_secret)
         logger.info("BitsoSpot: Successfully initialized with authenticator")
 
     def get_account_status(self):
@@ -31,13 +22,13 @@ class BitsoSpot(Action):
         """
         try:
             response = self.authenticator.authenticated_request(
-                url=f"{self.BASE_URL}/v3/account_status",
+                url=f"{self.config.base_url}/v3/account_status",
                 method='GET'
             )
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            print(f"Error getting account status: {e}")
+            logger.error(f"Error getting account status: {e}")
             return None
 
     def get_balance(self):
@@ -46,13 +37,13 @@ class BitsoSpot(Action):
         """
         try:
             response = self.authenticator.authenticated_request(
-                url=f"{self.BASE_URL}/v3/balance",
+                url=f"{self.config.base_url}/v3/balance",
                 method='GET'
             )
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            print(f"Error getting balance: {e}")
+            logger.error(f"Error getting balance: {e}")
             return None
 
     def get_available_books(self):
@@ -61,13 +52,13 @@ class BitsoSpot(Action):
         """
         try:
             response = self.authenticator.authenticated_request(
-                url=f"{self.BASE_URL}/v3/available_books",
+                url=f"{self.config.base_url}/v3/available_books",
                 method='GET'
             )
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            print(f"Error getting available books: {e}")
+            logger.error(f"Error getting available books: {e}")
             return None
 
     def place_order(self, book: str, side: str, order_type: str = 'market', amount: str = None, price: str = None):
@@ -101,10 +92,10 @@ class BitsoSpot(Action):
                 order_payload['price'] = price
 
             logger.info(f"BitsoSpot: Order payload: {order_payload}")
-            logger.info(f"BitsoSpot: Making API call to {self.BASE_URL}/v3/orders")
+            logger.info(f"BitsoSpot: Making API call to {self.config.base_url}/v3/orders")
 
             response = self.authenticator.authenticated_request(
-                url=f"{self.BASE_URL}/v3/orders",
+                url=f"{self.config.base_url}/v3/orders",
                 method='POST',
                 body=order_payload
             )
@@ -131,15 +122,15 @@ class BitsoSpot(Action):
         """
         try:
             response = self.authenticator.authenticated_request(
-                url=f"{self.BASE_URL}/v3/orders/{order_id}",
+                url=f"{self.config.base_url}/v3/orders/{order_id}",
                 method='DELETE'
             )
             response.raise_for_status()
             result = response.json()
-            print(f"Order cancelled successfully: {result}")
+            logger.info(f"Order cancelled successfully: {result}")
             return result
         except Exception as e:
-            print(f"Error cancelling order: {e}")
+            logger.error(f"Error cancelling order: {e}")
             return None
 
     def get_orders(self, book: str = None, status: str = None):
@@ -158,7 +149,7 @@ class BitsoSpot(Action):
                 params['status'] = status
 
             query_string = '&'.join([f"{k}={v}" for k, v in params.items()])
-            url = f"{self.BASE_URL}/v3/orders"
+            url = f"{self.config.base_url}/v3/orders"
             if query_string:
                 url += f"?{query_string}"
 
@@ -166,7 +157,7 @@ class BitsoSpot(Action):
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            print(f"Error getting orders: {e}")
+            logger.error(f"Error getting orders: {e}")
             return None
 
     def run(self, *args, **kwargs):
