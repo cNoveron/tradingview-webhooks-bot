@@ -32,5 +32,33 @@ class BitsoConfig:
         return self.__str__()
 
 
-# Create a singleton instance
+class RecallConfig:
+    """Configuration class for Recall API credentials and settings"""
+
+    def __init__(self):
+        self.api_key = os.getenv('RECALL_API_KEY')
+        self.environment = os.getenv('RECALL_ENVIRONMENT', 'sandbox')
+
+        # Set base URL based on environment
+        if self.environment == 'production':
+            self.base_url = os.getenv('RECALL_PROD_BASE_URL', 'https://api.competitions.recall.network')
+        else:
+            self.base_url = os.getenv('RECALL_SANDBOX_BASE_URL', 'https://api.sandbox.competitions.recall.network')
+
+        # Validate required credentials
+        if not self.api_key:
+            raise ValueError(
+                "Recall API key is required. Please set RECALL_API_KEY "
+                "environment variable or add it to your .env file"
+            )
+
+    def __str__(self):
+        return f"RecallConfig(environment='{self.environment}', base_url='{self.base_url}')"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+# Create singleton instances
 bitso_config = BitsoConfig()
+recall_config = RecallConfig()
