@@ -16,7 +16,9 @@ class RecallSpot(Action):
         self.authenticator = create_bearer_authenticator(self.config.api_key)
         logger.info("RecallSpot: Successfully initialized with authenticator")
 
-    def execute_trade(self, from_token: str, to_token: str, amount: str, reason: str = "Webhook trade execution"):
+    def execute_trade(self, from_token: str, to_token: str, amount: str, reason: str = "Webhook trade execution",
+                     slippage_tolerance: str = "0.5", from_chain: str = "evm", from_specific_chain: str = "mainnet",
+                     to_chain: str = "evm", to_specific_chain: str = "mainnet"):
         """
         Execute a token swap trade on Recall
 
@@ -25,16 +27,26 @@ class RecallSpot(Action):
             to_token: Destination token contract address
             amount: Amount to swap (in human units)
             reason: Reason for the trade
+            slippage_tolerance: Slippage tolerance percentage
+            from_chain: Source chain type
+            from_specific_chain: Specific source chain
+            to_chain: Destination chain type
+            to_specific_chain: Specific destination chain
         """
         try:
-            logger.info(f"RecallSpot: execute_trade called with from_token={from_token}, to_token={to_token}, amount={amount}, reason={reason}")
+            logger.info(f"RecallSpot: execute_trade called with from_token={from_token}, to_token={to_token}, amount={amount}")
 
-            # Build trade payload
+            # Build trade payload according to Recall API schema
             trade_payload = {
                 'fromToken': from_token,
                 'toToken': to_token,
                 'amount': amount,
-                'reason': reason
+                'reason': reason,
+                'slippageTolerance': slippage_tolerance,
+                'fromChain': from_chain,
+                'fromSpecificChain': from_specific_chain,
+                'toChain': to_chain,
+                'toSpecificChain': to_specific_chain
             }
 
             endpoint = f"{self.config.base_url}/api/trade/execute"
@@ -101,11 +113,16 @@ class RecallSpot(Action):
         """
         Main run method called by the webhook system
         Expected data format: {
-            "action": "swap",
-            "from_token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",  # USDC
-            "to_token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",    # WETH
+            "side": "buy",  # "buy" or "sell"
+            "base_token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",    # WETH (token being bought/sold)
+            "quote_token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",   # USDC (token used to buy/sell)
             "amount": "100",
-            "reason": "Optional reason for trade"
+            "reason": "Optional reason for trade",
+            "slippageTolerance": "0.5",  # Optional, defaults to 0.5%
+            "fromChain": "evm",  # Optional, defaults to evm
+            "fromSpecificChain": "mainnet",  # Optional, defaults to mainnet
+            "toChain": "evm",  # Optional, defaults to evm
+            "toSpecificChain": "mainnet"  # Optional, defaults to mainnet
         }
         """
         logger.info("==================== RecallSpot.run() START ====================")
@@ -119,26 +136,50 @@ class RecallSpot(Action):
             logger.info(f"RecallSpot: Validated data: {data}")
 
             # Extract required fields from webhook data
-            action = data.get('action')
-            from_token = data.get('from_token')
-            to_token = data.get('to_token')
+            side = data.get('side')
+            base_token = data.get('base_token')
+            quote_token = data.get('quote_token')
             amount = data.get('amount')
             reason = data.get('reason', 'Webhook trade execution')
 
-            logger.info(f"RecallSpot: Extracted action='{action}', from_token='{from_token}', to_token='{to_token}', amount='{amount}', reason='{reason}'")
+            # Optional fields with defaults
+            slippage_tolerance = data.get('slippageTolerance', '0.5')
+            from_chain = data.get('fromChain', 'evm')
+            from_specific_chain = data.get('fromSpecificChain', 'mainnet')
+            to_chain = data.get('toChain', 'evm')
+            to_specific_chain = data.get('toSpecificChain', 'mainnet')
 
-            if not action or action != 'swap':
-                raise ValueError("Action must be 'swap' for Recall trades")
+            logger.info(f"RecallSpot: Extracted side='{side}', base_token='{base_token}', quote_token='{quote_token}', amount='{amount}'")
 
-            if not from_token or not to_token or not amount:
-                raise ValueError("from_token, to_token, and amount are required for Recall trades")
+            if not side or side not in ['buy', 'sell']:
+                raise ValueError("Side must be 'buy' or 'sell'")
+
+            if not base_token or not quote_token or not amount:
+                raise ValueError("base_token, quote_token, and amount are required")
+
+            # Determine fromToken and toToken based on side
+            if side == 'buy':
+                # Buying base_token with quote_token
+                from_token = quote_token  # Selling quote token (e.g., USDC)
+                to_token = base_token     # Buying base token (e.g., WETH)
+                logger.info(f"RecallSpot: BUY order - selling {from_token} to buy {to_token}")
+            else:  # side == 'sell'
+                # Selling base_token for quote_token
+                from_token = base_token   # Selling base token (e.g., WETH)
+                to_token = quote_token    # Getting quote token (e.g., USDC)
+                logger.info(f"RecallSpot: SELL order - selling {from_token} to get {to_token}")
 
             logger.info("RecallSpot: Attempting to execute trade...")
             result = self.execute_trade(
                 from_token=from_token,
                 to_token=to_token,
                 amount=str(amount),
-                reason=reason
+                reason=reason,
+                slippage_tolerance=slippage_tolerance,
+                from_chain=from_chain,
+                from_specific_chain=from_specific_chain,
+                to_chain=to_chain,
+                to_specific_chain=to_specific_chain
             )
 
             if result:
