@@ -15,7 +15,61 @@ class RecallSpot(Action):
         self.config = recall_config
         self.authenticator = create_bearer_authenticator(self.config.api_key)
         self._token_mappings = {}  # Cache for symbol -> address mappings
+        self._initialize_token_mappings()  # Pre-populate with known tokens
         logger.info("RecallSpot: Successfully initialized with authenticator")
+
+    def _initialize_token_mappings(self):
+        """
+        Pre-populate token mappings with known tokens from portfolio
+        """
+        # Pre-populated token data from Recall portfolio
+        portfolio_data = {
+            "tokens": [
+                {"token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "symbol": "WETH", "chain": "evm"},
+                {"token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "symbol": "USDC", "chain": "evm"},
+                {"token": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", "symbol": "USDC", "chain": "evm"},  # Polygon USDC
+                {"token": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA", "symbol": "USDbC", "chain": "evm"},
+                {"token": "0xaf88d065e77c8cc2239327c5edb3a432268e5831", "symbol": "USDC", "chain": "evm"},  # Arbitrum USDC
+                {"token": "0x7f5c764cbc14f9669b88837ca1490cca17c31607", "symbol": "USDC", "chain": "evm"},  # Optimism USDC
+                {"token": "So11111111111111111111111111111111111111112", "symbol": "SOL", "chain": "svm", "specificChain": "svm"},
+                {"token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "symbol": "USDC", "chain": "svm", "specificChain": "svm"}
+            ]
+        }
+
+        mappings = {}
+
+        for token_info in portfolio_data["tokens"]:
+            chain_type = token_info.get('chain', 'evm')
+            specific_chain = token_info.get('specificChain', 'mainnet' if chain_type == 'evm' else chain_type)
+            symbol = token_info.get('symbol', '').upper()
+            address = token_info.get('token', '')
+
+            # Use specificChain as the key for mapping
+            chain_key = specific_chain
+
+            if chain_key not in mappings:
+                mappings[chain_key] = {}
+
+            if symbol and address:
+                # For multiple USDC addresses, prefer mainnet (first one in our list)
+                if symbol not in mappings[chain_key]:
+                    mappings[chain_key][symbol] = address
+                    logger.debug(f"Added mapping: {chain_key}.{symbol} -> {address}")
+                else:
+                    logger.debug(f"Skipped duplicate mapping for {chain_key}.{symbol}")
+
+        # Add some common aliases
+        if 'mainnet' in mappings:
+            # Add ETH as alias for WETH on mainnet
+            if 'WETH' in mappings['mainnet'] and 'ETH' not in mappings['mainnet']:
+                mappings['mainnet']['ETH'] = mappings['mainnet']['WETH']
+                logger.debug(f"Added ETH alias for WETH on mainnet")
+
+        self._token_mappings = mappings
+        logger.info(f"Pre-populated token mappings for {len(mappings)} chains with {sum(len(tokens) for tokens in mappings.values())} total tokens")
+        logger.info(f"Available chains: {list(mappings.keys())}")
+        for chain, tokens in mappings.items():
+            logger.info(f"  {chain}: {list(tokens.keys())}")
 
     def get_portfolio(self):
         """
@@ -37,61 +91,52 @@ class RecallSpot(Action):
     def build_token_mappings(self):
         """
         Build symbol -> address mappings from portfolio data, organized by chain
-        Returns dict like: {'mainnet': {'ETH': '0x...', 'USDC': '0x...'}, 'polygon': {...}}
+        This will refresh mappings from the live API (fallback to pre-populated data)
         """
         try:
             portfolio = self.get_portfolio()
             if not portfolio:
-                logger.error("Failed to retrieve portfolio for token mappings")
-                return {}
+                logger.warning("Failed to retrieve portfolio, using pre-populated mappings")
+                return self._token_mappings
 
             mappings = {}
 
             # Extract token information from portfolio
-            # Adjust this based on actual Recall API response structure
             if 'tokens' in portfolio:
                 for token_info in portfolio['tokens']:
-                    chain = token_info.get('chain', 'mainnet')
+                    chain_type = token_info.get('chain', 'evm')
+                    specific_chain = token_info.get('specificChain', 'mainnet' if chain_type == 'evm' else chain_type)
                     symbol = token_info.get('symbol', '').upper()
-                    address = token_info.get('address', '')
+                    address = token_info.get('token', '') or token_info.get('address', '')
 
-                    if chain not in mappings:
-                        mappings[chain] = {}
+                    # Use specificChain as the key
+                    chain_key = specific_chain
 
-                    if symbol and address:
-                        mappings[chain][symbol] = address
-                        logger.debug(f"Added mapping: {chain}.{symbol} -> {address}")
-
-            # If tokens are nested differently, try alternative structures
-            elif 'balances' in portfolio:
-                for balance_info in portfolio['balances']:
-                    chain = balance_info.get('chain', 'mainnet')
-                    symbol = balance_info.get('symbol', '').upper()
-                    address = balance_info.get('tokenAddress', '') or balance_info.get('address', '')
-
-                    if chain not in mappings:
-                        mappings[chain] = {}
+                    if chain_key not in mappings:
+                        mappings[chain_key] = {}
 
                     if symbol and address:
-                        mappings[chain][symbol] = address
-                        logger.debug(f"Added mapping: {chain}.{symbol} -> {address}")
+                        mappings[chain_key][symbol] = address
+                        logger.debug(f"Updated mapping: {chain_key}.{symbol} -> {address}")
+
+            # Add common aliases
+            if 'mainnet' in mappings:
+                if 'WETH' in mappings['mainnet'] and 'ETH' not in mappings['mainnet']:
+                    mappings['mainnet']['ETH'] = mappings['mainnet']['WETH']
 
             self._token_mappings = mappings
-            logger.info(f"Built token mappings for {len(mappings)} chains with {sum(len(tokens) for tokens in mappings.values())} total tokens")
+            logger.info(f"Updated token mappings from API for {len(mappings)} chains")
             return mappings
 
         except Exception as e:
-            logger.error(f"Error building token mappings: {e}")
-            return {}
+            logger.error(f"Error building token mappings from API: {e}")
+            logger.info("Falling back to pre-populated mappings")
+            return self._token_mappings
 
     def get_token_address(self, symbol: str, chain: str = 'mainnet'):
         """
         Get token address for a given symbol and chain
         """
-        # Build mappings if not cached
-        if not self._token_mappings:
-            self.build_token_mappings()
-
         symbol = symbol.upper()
 
         if chain in self._token_mappings and symbol in self._token_mappings[chain]:
@@ -99,11 +144,21 @@ class RecallSpot(Action):
             logger.info(f"Found address for {symbol} on {chain}: {address}")
             return address
         else:
-            logger.error(f"No address found for symbol '{symbol}' on chain '{chain}'")
-            logger.info(f"Available chains: {list(self._token_mappings.keys())}")
-            if chain in self._token_mappings:
-                logger.info(f"Available symbols on {chain}: {list(self._token_mappings[chain].keys())}")
-            return None
+            # Try to refresh mappings from API if symbol not found
+            logger.info(f"Symbol '{symbol}' not found on {chain}, trying to refresh from API...")
+            self.build_token_mappings()
+
+            # Try again after refresh
+            if chain in self._token_mappings and symbol in self._token_mappings[chain]:
+                address = self._token_mappings[chain][symbol]
+                logger.info(f"Found address for {symbol} on {chain} after refresh: {address}")
+                return address
+            else:
+                logger.error(f"No address found for symbol '{symbol}' on chain '{chain}'")
+                logger.info(f"Available chains: {list(self._token_mappings.keys())}")
+                if chain in self._token_mappings:
+                    logger.info(f"Available symbols on {chain}: {list(self._token_mappings[chain].keys())}")
+                return None
 
     def execute_trade(self, from_token: str, to_token: str, amount: str, reason: str = "Webhook trade execution",
                      slippage_tolerance: str = "0.5", from_chain: str = "evm", from_specific_chain: str = "mainnet",
@@ -203,15 +258,15 @@ class RecallSpot(Action):
         Main run method called by the webhook system
         Expected data format: {
             "side": "buy",  # "buy" or "sell"
-            "base": "ETH",    # Symbol of token being bought/sold (e.g., "ETH", "BTC")
+            "base": "ETH",    # Symbol of token being bought/sold (e.g., "ETH", "BTC", "SOL")
             "quote": "USDC",  # Symbol of quote token (e.g., "USDC", "USDT")
             "size": "1.5",    # Amount to trade
             "reason": "Optional reason for trade",
             "slippageTolerance": "0.5",  # Optional, defaults to 0.5%
             "fromChain": "evm",  # Optional, defaults to evm
-            "fromSpecificChain": "mainnet",  # Optional, defaults to mainnet
+            "fromSpecificChain": "mainnet",  # Optional, defaults to mainnet (or svm for Solana)
             "toChain": "evm",  # Optional, defaults to evm
-            "toSpecificChain": "mainnet"  # Optional, defaults to mainnet
+            "toSpecificChain": "mainnet"  # Optional, defaults to mainnet (or svm for Solana)
         }
         """
         logger.info("==================== RecallSpot.run() START ====================")
