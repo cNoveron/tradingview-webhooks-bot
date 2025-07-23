@@ -40,7 +40,7 @@ class RecallConfig:
         self.environment = os.getenv('RECALL_ENVIRONMENT', 'sandbox')
 
         # Set base URL based on environment
-        if self.environment == 'production':
+        if False and self.environment == 'production':
             self.base_url = os.getenv('RECALL_PROD_BASE_URL', 'https://api.competitions.recall.network')
         else:
             self.base_url = os.getenv('RECALL_SANDBOX_BASE_URL', 'https://api.sandbox.competitions.recall.network')
