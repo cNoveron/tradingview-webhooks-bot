@@ -63,7 +63,19 @@ def start(
 
     def run_server():
         print("Close server with Ctrl+C in terminal.")
-        run(f'gunicorn --bind {host}:{port} wsgi:app --workers {workers}'.split(' '))
+        # Always run from src directory to ensure proper imports
+        import os
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        original_dir = os.getcwd()
+
+        # Change to src directory
+        os.chdir(script_dir)
+
+        try:
+            run(f'gunicorn --bind {host}:{port} wsgi:app --workers {workers}'.split(' '))
+        finally:
+            # Restore original directory
+            os.chdir(original_dir)
 
     # clear gui key if gui is set to open, else generate key
     # Flask uses the existence of the key file to determine GUI mode
