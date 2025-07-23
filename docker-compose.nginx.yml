@@ -6,12 +6,12 @@ services:
     volumes:
       - ./src/components:/app/components
       - ./src/settings.py:/app/settings.py
-      - ./src/.gui_key:/app/.gui_key
+      - ./src/.env:/app/.env
     ports:
       - "127.0.0.1:5001:5001"  # Only bind to localhost, not exposed externally
     networks:
       - app-network
-    command: ["python3", "tvwb.py", "start", "--host", "0.0.0.0", "--port", "5000"]
+    command: ["python3", "tvwb.py", "start", "--host", "0.0.0.0", "--port", "5001", "--open-gui"]
     environment:
       - FLASK_ENV=production
 
