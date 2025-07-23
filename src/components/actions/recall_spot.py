@@ -245,30 +245,27 @@ class RecallSpot(Action):
 
             if not base_symbol or not quote_symbol or not amount:
                 raise ValueError("base, quote, and size are required")
-
-            # Convert symbols to addresses
-            base_token_address = self.get_token_address(base_symbol, from_specific_chain)
-            quote_token_address = self.get_token_address(quote_symbol, from_specific_chain)
-
-            if not base_token_address:
-                raise ValueError(f"Could not find address for base token '{base_symbol}' on {from_specific_chain}")
-
-            if not quote_token_address:
-                raise ValueError(f"Could not find address for quote token '{quote_symbol}' on {from_specific_chain}")
-
-            logger.info(f"RecallSpot: Resolved addresses - {base_symbol}: {base_token_address}, {quote_symbol}: {quote_token_address}")
-
             # Determine fromToken and toToken based on side
             if side == 'buy':
                 # Buying base_token with quote_token
-                from_token = quote_token_address  # Selling quote token (e.g., USDC)
-                to_token = base_token_address     # Buying base token (e.g., ETH)
-                logger.info(f"RecallSpot: BUY {base_symbol} with {quote_symbol} - selling {from_token} to buy {to_token}")
+                from_token = self.get_token_address(quote_symbol, from_specific_chain)  # Selling quote token (e.g., USDC)
+                to_token = self.get_token_address(base_symbol, to_specific_chain)     # Buying base token (e.g., ETH)
+                logger.info(f"RecallSpot: BUY {base_symbol} with {quote_symbol}")
+                logger.info(f"RecallSpot: OUT - {quote_symbol}: {from_token}")
+                logger.info(f"RecallSpot: IN - {base_symbol}: {to_token}")
             else:  # side == 'sell'
                 # Selling base_token for quote_token
-                from_token = base_token_address   # Selling base token (e.g., ETH)
-                to_token = quote_token_address    # Getting quote token (e.g., USDC)
+                from_token = self.get_token_address(base_symbol, from_specific_chain)   # Selling base token (e.g., ETH)
+                to_token = self.get_token_address(quote_symbol, to_specific_chain)    # Getting quote token (e.g., USDC)
                 logger.info(f"RecallSpot: SELL {base_symbol} for {quote_symbol} - selling {from_token} to get {to_token}")
+                logger.info(f"RecallSpot: OUT - {base_symbol}: {from_token}")
+                logger.info(f"RecallSpot: IN - {quote_symbol}: {to_token}")
+
+            # if not base_token_address:
+            #     raise ValueError(f"Could not find address for base token '{base_symbol}' on {from_specific_chain}")
+
+            # if not quote_token_address:
+            #     raise ValueError(f"Could not find address for quote token '{quote_symbol}' on {from_specific_chain}")
 
             logger.info("RecallSpot: Attempting to execute trade...")
             result = self.execute_trade(
