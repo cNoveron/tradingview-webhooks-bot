@@ -186,22 +186,31 @@ class RecallSpot(Action):
                 'toToken': to_token,
                 'amount': amount,
                 'reason': reason,
-                'slippageTolerance': slippage_tolerance,
-                'fromChain': from_chain,
-                'fromSpecificChain': from_specific_chain,
-                'toChain': to_chain,
-                'toSpecificChain': to_specific_chain
+                # 'slippageTolerance': slippage_tolerance,
+                # 'fromChain': from_chain,
+                # 'fromSpecificChain': from_specific_chain,
+                # 'toChain': to_chain,
+                # 'toSpecificChain': to_specific_chain
             }
 
             endpoint = f"{self.config.base_url}/api/trade/execute"
             logger.info(f"RecallSpot: Trade payload: {trade_payload}")
             logger.info(f"RecallSpot: Making API call to {endpoint}")
 
-            response = self.authenticator.authenticated_request(
-                url=endpoint,
-                method='POST',
-                body=trade_payload
-            )
+            # DEBUG: Let's manually make the request to see what's different
+            import requests
+            import json
+
+            headers = {
+                'Authorization': f'Bearer {self.config.api_key}',
+                'Content-Type': 'application/json'
+            }
+
+            logger.info(f"DEBUG: Headers being sent: {headers}")
+            logger.info(f"DEBUG: Raw JSON payload: {json.dumps(trade_payload)}")
+
+            # Make request manually for debugging
+            response = requests.post(endpoint, json=trade_payload, headers=headers, timeout=30)
 
             logger.info(f"RecallSpot: API response status: {response.status_code}")
             logger.info(f"RecallSpot: API response headers: {dict(response.headers)}")
@@ -328,11 +337,11 @@ class RecallSpot(Action):
                 to_token=to_token,
                 amount=str(amount),
                 reason=reason,
-                slippage_tolerance=slippage_tolerance,
-                from_chain=from_chain,
-                from_specific_chain=from_specific_chain,
-                to_chain=to_chain,
-                to_specific_chain=to_specific_chain
+                # slippage_tolerance=slippage_tolerance,
+                # from_chain=from_chain,
+                # from_specific_chain=from_specific_chain,
+                # to_chain=to_chain,
+                # to_specific_chain=to_specific_chain
             )
 
             if result:
