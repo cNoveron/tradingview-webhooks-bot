@@ -14,7 +14,96 @@ class RecallSpot(Action):
 
         self.config = recall_config
         self.authenticator = create_bearer_authenticator(self.config.api_key)
+        self._token_mappings = {}  # Cache for symbol -> address mappings
         logger.info("RecallSpot: Successfully initialized with authenticator")
+
+    def get_portfolio(self):
+        """
+        Get portfolio information from Recall API including available tokens
+        """
+        try:
+            response = self.authenticator.authenticated_request(
+                url=f"{self.config.base_url}/api/agent/portfolio",
+                method='GET'
+            )
+            response.raise_for_status()
+            portfolio = response.json()
+            logger.info(f"Portfolio retrieved successfully")
+            return portfolio
+        except Exception as e:
+            logger.error(f"Error getting portfolio: {e}")
+            return None
+
+    def build_token_mappings(self):
+        """
+        Build symbol -> address mappings from portfolio data, organized by chain
+        Returns dict like: {'mainnet': {'ETH': '0x...', 'USDC': '0x...'}, 'polygon': {...}}
+        """
+        try:
+            portfolio = self.get_portfolio()
+            if not portfolio:
+                logger.error("Failed to retrieve portfolio for token mappings")
+                return {}
+
+            mappings = {}
+
+            # Extract token information from portfolio
+            # Adjust this based on actual Recall API response structure
+            if 'tokens' in portfolio:
+                for token_info in portfolio['tokens']:
+                    chain = token_info.get('chain', 'mainnet')
+                    symbol = token_info.get('symbol', '').upper()
+                    address = token_info.get('address', '')
+
+                    if chain not in mappings:
+                        mappings[chain] = {}
+
+                    if symbol and address:
+                        mappings[chain][symbol] = address
+                        logger.debug(f"Added mapping: {chain}.{symbol} -> {address}")
+
+            # If tokens are nested differently, try alternative structures
+            elif 'balances' in portfolio:
+                for balance_info in portfolio['balances']:
+                    chain = balance_info.get('chain', 'mainnet')
+                    symbol = balance_info.get('symbol', '').upper()
+                    address = balance_info.get('tokenAddress', '') or balance_info.get('address', '')
+
+                    if chain not in mappings:
+                        mappings[chain] = {}
+
+                    if symbol and address:
+                        mappings[chain][symbol] = address
+                        logger.debug(f"Added mapping: {chain}.{symbol} -> {address}")
+
+            self._token_mappings = mappings
+            logger.info(f"Built token mappings for {len(mappings)} chains with {sum(len(tokens) for tokens in mappings.values())} total tokens")
+            return mappings
+
+        except Exception as e:
+            logger.error(f"Error building token mappings: {e}")
+            return {}
+
+    def get_token_address(self, symbol: str, chain: str = 'mainnet'):
+        """
+        Get token address for a given symbol and chain
+        """
+        # Build mappings if not cached
+        if not self._token_mappings:
+            self.build_token_mappings()
+
+        symbol = symbol.upper()
+
+        if chain in self._token_mappings and symbol in self._token_mappings[chain]:
+            address = self._token_mappings[chain][symbol]
+            logger.info(f"Found address for {symbol} on {chain}: {address}")
+            return address
+        else:
+            logger.error(f"No address found for symbol '{symbol}' on chain '{chain}'")
+            logger.info(f"Available chains: {list(self._token_mappings.keys())}")
+            if chain in self._token_mappings:
+                logger.info(f"Available symbols on {chain}: {list(self._token_mappings[chain].keys())}")
+            return None
 
     def execute_trade(self, from_token: str, to_token: str, amount: str, reason: str = "Webhook trade execution",
                      slippage_tolerance: str = "0.5", from_chain: str = "evm", from_specific_chain: str = "mainnet",
@@ -114,9 +203,9 @@ class RecallSpot(Action):
         Main run method called by the webhook system
         Expected data format: {
             "side": "buy",  # "buy" or "sell"
-            "base_token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",    # WETH (token being bought/sold)
-            "quote_token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",   # USDC (token used to buy/sell)
-            "amount": "100",
+            "base": "ETH",    # Symbol of token being bought/sold (e.g., "ETH", "BTC")
+            "quote": "USDC",  # Symbol of quote token (e.g., "USDC", "USDT")
+            "size": "1.5",    # Amount to trade
             "reason": "Optional reason for trade",
             "slippageTolerance": "0.5",  # Optional, defaults to 0.5%
             "fromChain": "evm",  # Optional, defaults to evm
@@ -137,9 +226,9 @@ class RecallSpot(Action):
 
             # Extract required fields from webhook data
             side = data.get('side')
-            base_token = data.get('base_token')
-            quote_token = data.get('quote_token')
-            amount = data.get('amount')
+            base_symbol = data.get('base')
+            quote_symbol = data.get('quote')
+            amount = data.get('size')
             reason = data.get('reason', 'Webhook trade execution')
 
             # Optional fields with defaults
@@ -149,25 +238,37 @@ class RecallSpot(Action):
             to_chain = data.get('toChain', 'evm')
             to_specific_chain = data.get('toSpecificChain', 'mainnet')
 
-            logger.info(f"RecallSpot: Extracted side='{side}', base_token='{base_token}', quote_token='{quote_token}', amount='{amount}'")
+            logger.info(f"RecallSpot: Extracted side='{side}', base='{base_symbol}', quote='{quote_symbol}', size='{amount}'")
 
             if not side or side not in ['buy', 'sell']:
                 raise ValueError("Side must be 'buy' or 'sell'")
 
-            if not base_token or not quote_token or not amount:
-                raise ValueError("base_token, quote_token, and amount are required")
+            if not base_symbol or not quote_symbol or not amount:
+                raise ValueError("base, quote, and size are required")
+
+            # Convert symbols to addresses
+            base_token_address = self.get_token_address(base_symbol, from_specific_chain)
+            quote_token_address = self.get_token_address(quote_symbol, from_specific_chain)
+
+            if not base_token_address:
+                raise ValueError(f"Could not find address for base token '{base_symbol}' on {from_specific_chain}")
+
+            if not quote_token_address:
+                raise ValueError(f"Could not find address for quote token '{quote_symbol}' on {from_specific_chain}")
+
+            logger.info(f"RecallSpot: Resolved addresses - {base_symbol}: {base_token_address}, {quote_symbol}: {quote_token_address}")
 
             # Determine fromToken and toToken based on side
             if side == 'buy':
                 # Buying base_token with quote_token
-                from_token = quote_token  # Selling quote token (e.g., USDC)
-                to_token = base_token     # Buying base token (e.g., WETH)
-                logger.info(f"RecallSpot: BUY order - selling {from_token} to buy {to_token}")
+                from_token = quote_token_address  # Selling quote token (e.g., USDC)
+                to_token = base_token_address     # Buying base token (e.g., ETH)
+                logger.info(f"RecallSpot: BUY {base_symbol} with {quote_symbol} - selling {from_token} to buy {to_token}")
             else:  # side == 'sell'
                 # Selling base_token for quote_token
-                from_token = base_token   # Selling base token (e.g., WETH)
-                to_token = quote_token    # Getting quote token (e.g., USDC)
-                logger.info(f"RecallSpot: SELL order - selling {from_token} to get {to_token}")
+                from_token = base_token_address   # Selling base token (e.g., ETH)
+                to_token = quote_token_address    # Getting quote token (e.g., USDC)
+                logger.info(f"RecallSpot: SELL {base_symbol} for {quote_symbol} - selling {from_token} to get {to_token}")
 
             logger.info("RecallSpot: Attempting to execute trade...")
             result = self.execute_trade(
