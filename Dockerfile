@@ -1,3 +1,5 @@
+LABEL name="tvwb"
+LABEL version="1.0"
 FROM python:3.11-alpine
 
 COPY src /app
