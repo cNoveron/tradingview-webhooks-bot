@@ -44,9 +44,11 @@ RUN apk add --no-cache python3 python3-dev py3-pip supervisor gcc musl-dev
 # Copy Python app from first stage
 COPY --from=app /app /app
 
-# Install Python dependencies
+# Create virtual environment and install Python dependencies
 WORKDIR /app
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN python3 -m venv /app/venv && \
+    /app/venv/bin/pip install --upgrade pip && \
+    /app/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -61,5 +63,6 @@ RUN mkdir -p /var/log/supervisor
 EXPOSE 80
 
 ENV PYTHONPATH=/app
+ENV PATH="/app/venv/bin:$PATH"
 # Start supervisor to run both nginx and the Python app
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
