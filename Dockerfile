@@ -1,4 +1,4 @@
-FROM python:3.11-alpine
+FROM python:3.11-alpine AS app
 LABEL name="tvwb"
 LABEL version="1.0"
 
@@ -34,4 +34,34 @@ RUN pip install --upgrade pip && \
     --extra-index-url https://pypi.python.org/simple/ \
     --trusted-host pypi.org --trusted-host pypi.python.org \
     -r requirements.txt
-EXPOSE 5001
+
+# Final stage with nginx
+FROM nginx:alpine
+
+# Install Python 3.11 and supervisor
+RUN apk add --no-cache python3 python3-dev py3-pip supervisor gcc musl-dev
+
+# Copy Python app from first stage
+COPY --from=app /app /app
+
+# Copy and install Python dependencies
+COPY --from=app /app/requirements.txt /app/requirements.txt
+RUN pip3 install --no-cache-dir -r /app/requirements.txt
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy supervisor configuration
+COPY supervisord.conf /etc/supervisord.conf
+
+# Create necessary directories
+RUN mkdir -p /var/log/supervisor
+
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+# Expose port 80 for nginx
+EXPOSE 80
+
+# Start supervisor to run both nginx and the Python app
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
