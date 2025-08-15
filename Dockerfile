@@ -50,5 +50,6 @@ RUN mkdir -p /var/log/supervisor
 # Expose port 80 for nginx
 EXPOSE 80
 
+ENV PYTHONPATH=/app
 # Start supervisor to run both nginx and the Python app
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
