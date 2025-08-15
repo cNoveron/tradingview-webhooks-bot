@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Navigate to the src/app directory
-cd src/app
-
 # Install dependencies
 export PYTHONPATH=/app
 pip install --upgrade pip && \
