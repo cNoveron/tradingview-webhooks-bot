@@ -6,6 +6,16 @@ COPY src /app
 WORKDIR /app
 ENV PYTHONPATH=/app
 
+ARG BITSO_API_KEY
+ARG BITSO_API_SECRET
+ARG BITSO_ENVIRONMENT
+ARG BITSO_PROD_BASE_URL
+ARG BITSO_STAGE_BASE_URL
+ARG RECALL_API_KEY
+ARG RECALL_ENVIRONMENT
+ARG RECALL_PROD_BASE_URL
+ARG RECALL_SANDBOX_BASE_URL
+
 # Create .env file with environment variables available during build
 RUN echo "# Environment variables for TVWB" > /app/.env && \
     echo "BITSO_API_KEY=${BITSO_API_KEY}" >> /app/.env && \
