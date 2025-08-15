@@ -176,24 +176,24 @@ class BitsoSpot(Action):
             logger.info(f"BitsoSpot: Validated data: {data}")
 
             # Extract action and order_size from webhook data
-            action = data.get('action')
-            order_size = data.get('order_size')
-            logger.info(f"BitsoSpot: Extracted action='{action}', order_size='{order_size}'")
+            side = data.get('side')
+            size = data.get('size')
+            logger.info(f"BitsoSpot: Extracted side='{side}', size='{size}'")
 
-            if not action or not order_size:
+            if not side or not size:
                 raise ValueError("Both 'action' and 'order_size' are required in webhook data")
 
             # Default trading pair - you can modify this or make it configurable
             book = data.get('book', 'btc_mxn')  # Default to BTC/MXN
-            logger.info(f"BitsoSpot: Using book='{book}' for {action} order of size {order_size}")
+            logger.info(f"BitsoSpot: Using book='{book}' for {side} order of size {size}")
 
             # Place the order
             logger.info("BitsoSpot: Attempting to place order...")
             result = self.place_order(
                 book=book,
-                side=action,
+                side=side,
                 order_type='market',
-                amount=str(order_size)
+                amount=str(size)
             )
 
             if result:
