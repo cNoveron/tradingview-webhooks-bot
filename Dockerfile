@@ -44,10 +44,6 @@ RUN apk add --no-cache python3 python3-dev py3-pip supervisor gcc musl-dev
 # Copy Python app from first stage
 COPY --from=app /app /app
 
-# Copy and install Python dependencies
-COPY --from=app /app/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
-
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
