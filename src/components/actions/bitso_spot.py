@@ -79,14 +79,9 @@ class BitsoSpot(Action):
             order_payload = {
                 'book': book,
                 'side': side,
-                'type': order_type
+                'type': order_type,
+                'major': amount
             }
-
-            if amount:
-                if side == 'buy':
-                    order_payload['minor'] = amount  # Amount in quote currency for buy orders
-                else:
-                    order_payload['major'] = amount  # Amount in base currency for sell orders
 
             if order_type == 'limit' and price:
                 order_payload['price'] = price
