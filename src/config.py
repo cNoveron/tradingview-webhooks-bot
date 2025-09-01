@@ -59,6 +59,30 @@ class RecallConfig:
         return self.__str__()
 
 
+class MT5Config:
+    """Configuration class for MetaTrader 5 demo account credentials and settings"""
+
+    def __init__(self):
+        self.login = int(os.getenv('MT5_LOGIN'))  # Demo account number
+        self.password = os.getenv('MT5_PASSWORD')
+        self.server = os.getenv('MT5_SERVER', 'MetaQuotes-Demo')  # Demo server
+        self.environment = os.getenv('MT5_ENVIRONMENT', 'demo')
+
+        # Validate required credentials
+        if not self.password:
+            raise ValueError(
+                "MT5 password is required. Please set MT5_PASSWORD "
+                "environment variable or add it to your .env file"
+            )
+
+    def __str__(self):
+        return f"MT5Config(login='{self.login}', server='{self.server}', environment='{self.environment}')"
+
+    def __repr__(self):
+        return self.__str__()
+
+
 # Create singleton instances
 bitso_config = BitsoConfig()
 recall_config = RecallConfig()
+mt5_config = MT5Config()
