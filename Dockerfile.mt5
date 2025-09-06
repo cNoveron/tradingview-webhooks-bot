@@ -1,0 +1,59 @@
+# Use Ubuntu base with Wine support
+FROM ubuntu:22.04
+
+# Prevent timezone prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+# Update and install dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    software-properties-common \
+    xvfb \
+    x11vnc \
+    python3 \
+    python3-pip \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Wine repository and install Wine
+RUN dpkg --add-architecture i386 && \
+    wget -nc https://dl.winehq.org/wine-builds/winehq.key && \
+    apt-key add winehq.key && \
+    add-apt-repository 'deb https://dl.winehq.org/wine-builds/ubuntu/ jammy main' && \
+    apt-get update && \
+    apt-get install -y --install-recommends winehq-stable && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set up Wine environment
+ENV WINEARCH=win64
+ENV DISPLAY=:99
+ENV WINEPREFIX=/wine
+
+# Initialize Wine
+RUN winecfg
+
+# Install Python packages
+RUN pip3 install --upgrade pip && \
+    pip3 install MetaTrader5 pandas numpy
+
+# Copy application files
+WORKDIR /app
+COPY src/requirements.txt .
+RUN pip3 install -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
+
+# Start script for X server and application
+RUN echo '#!/bin/bash\n\
+Xvfb :99 -screen 0 1024x768x16 &\n\
+sleep 2\n\
+x11vnc -display :99 -nopw -listen 0.0.0.0 -xkb -forever &\n\
+cd /app\n\
+exec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+EXPOSE 5900
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python3", "main.py"]

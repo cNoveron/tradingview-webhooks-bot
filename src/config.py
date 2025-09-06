@@ -63,16 +63,31 @@ class MT5Config:
     """Configuration class for MetaTrader 5 demo account credentials and settings"""
 
     def __init__(self):
-        self.login = int(os.getenv('MT5_LOGIN'))  # Demo account number
+        # Get credentials from environment variables
+        login_str = os.getenv('MT5_LOGIN')
         self.password = os.getenv('MT5_PASSWORD')
         self.server = os.getenv('MT5_SERVER', 'MetaQuotes-Demo')  # Demo server
         self.environment = os.getenv('MT5_ENVIRONMENT', 'demo')
 
         # Validate required credentials
+        if not login_str:
+            raise ValueError(
+                "MT5 login is required. Please set MT5_LOGIN "
+                "environment variable or add it to your .env file"
+            )
+
         if not self.password:
             raise ValueError(
                 "MT5 password is required. Please set MT5_PASSWORD "
                 "environment variable or add it to your .env file"
+            )
+
+        # Convert login to integer
+        try:
+            self.login = int(login_str)
+        except ValueError:
+            raise ValueError(
+                f"MT5_LOGIN must be a valid integer, got: {login_str}"
             )
 
     def __str__(self):

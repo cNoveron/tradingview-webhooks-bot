@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  tradingview-bot-mt5:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.mt5
+    container_name: tradingview-webhooks-bot-mt5
+    environment:
+      - DISPLAY=:99
+      - WINEARCH=win64
+    ports:
+      - "5000:5000"  # Flask API
+      - "5900:5900"  # VNC server
+    volumes:
+      - ./data:/app/data
+      - wine-data:/wine
+    env_file:
+      - ./src/.env
+    restart: unless-stopped
+
+volumes:
+  wine-data:
